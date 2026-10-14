@@ -1,0 +1,87 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R 7 0 R 9 0 R] /Count 4 >>
+endobj
+
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 900] /Contents 4 0 R /Resources << /Font << /F1 11 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 58 >>
+stream
+BT
+/F1 24 Tf
+150 750 Td
+(PDF PAGE 1 - FRONT COVER) Tj
+ET
+endstream
+endobj
+
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1600 800] /Contents 6 0 R /Resources << /Font << /F1 11 0 R >> >> >>
+endobj
+6 0 obj
+<< /Length 64 >>
+stream
+BT
+/F1 28 Tf
+450 650 Td
+(PDF PAGE 2 - WIDE SPREAD SPREAD) Tj
+ET
+endstream
+endobj
+
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 900] /Contents 8 0 R /Resources << /Font << /F1 11 0 R >> >> >>
+endobj
+8 0 obj
+<< /Length 62 >>
+stream
+BT
+/F1 24 Tf
+150 750 Td
+(PDF PAGE 3 - MIDDLE SINGLE PAGE) Tj
+ET
+endstream
+endobj
+
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1600 800] /Contents 10 0 R /Resources << /Font << /F1 11 0 R >> >> >>
+endobj
+10 0 obj
+<< /Length 57 >>
+stream
+BT
+/F1 28 Tf
+450 650 Td
+(PDF PAGE 4 - WIDE BACK COVER) Tj
+ET
+endstream
+endobj
+
+11 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+
+xref
+0 12
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000130 00000 n 
+0000000259 00000 n 
+0000000368 00000 n 
+0000000498 00000 n 
+0000000613 00000 n 
+0000000742 00000 n 
+0000000855 00000 n 
+0000000985 00000 n 
+0000001093 00000 n 
+trailer
+<< /Size 12 /Root 1 0 R >>
+startxref
+1175
+%%EOF

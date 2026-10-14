@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  --background: #07090e;
+  --foreground: #f8fafc;
+  --card: #111522;
+  --card-foreground: #f8fafc;
+  --border: #1e2436;
+  --input: #1e2436;
+  --primary: #8b5cf6;
+  --primary-hover: #7c3aed;
+  --primary-foreground: #ffffff;
+  --secondary: #161b2a;
+  --secondary-foreground: #e2e8f0;
+  --muted: #0d1017;
+  --muted-foreground: #94a3b8;
+  --accent: #261947;
+  --accent-foreground: #c4b5fd;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --success: #10b981;
+  --warning: #f59e0b;
+}
+
+body {
+  background-color: #07090e;
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0e17;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e2538;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2e3852;
+}
+
+/* Page flip transition helper */
+.perspective-1000 {
+  perspective: 1200px;
+}
+.transform-style-preserve-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+/* Completely remove Next.js floating dev indicator button and popup menu */
+nextjs-portal,
+[data-nextjs-dev-tools-button],
+[data-nextjs-toast],
+[data-next-badge],
+div[data-nextjs-dialog-overlay] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
