@@ -97,6 +97,13 @@ export const PhysicalPageTurnStage = forwardRef<PhysicalPageTurnStageRef, Physic
     const rafIdRef = useRef<number | null>(null);
     const pendingSpreadIndexRef = useRef<number | null>(null);
 
+    // MOBILE TOUCH GESTURE REFS
+    const touchPointerIdRef = useRef<number | null>(null);
+    const touchStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const touchStartTimeRef = useRef<number>(0);
+    const touchGestureStateRef = useRef<'idle' | 'pending' | 'horizontal' | 'vertical'>('idle');
+    const wasSwipingRef = useRef<boolean>(false);
+
     // React state only for mounting/unmounting the turning layer
     const [turnState, setTurnState] = useState<{
       active: boolean;
@@ -551,13 +558,14 @@ export const PhysicalPageTurnStage = forwardRef<PhysicalPageTurnStageRef, Physic
     );
 
     // -------------------------------------------------------------
-    // POINTER EVENTS INTERACTION (Mouse & Touch)
+    // POINTER EVENTS INTERACTION (Desktop Mouse)
     // -------------------------------------------------------------
     const handlePointerDown = async (
       e: React.PointerEvent<HTMLDivElement>,
       direction: TurnDirection,
       region: GrabRegion
     ) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
       if (
         isZoomed ||
         isAnimatingRef.current ||
@@ -567,7 +575,6 @@ export const PhysicalPageTurnStage = forwardRef<PhysicalPageTurnStageRef, Physic
       ) {
         return;
       }
-      if (e.button !== 0 && e.pointerType === 'mouse') return;
       const destSpread = direction === 'next' ? nextSpread : prevSpread;
       if (!destSpread) return;
 
@@ -606,6 +613,7 @@ export const PhysicalPageTurnStage = forwardRef<PhysicalPageTurnStageRef, Physic
     };
 
     const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType !== 'mouse') return;
       if (!isInteractingRef.current || isAnimatingRef.current) return;
 
       const isSingleSheet = (isCover && isWideCover) || (isBackCover && isWideBackCover);
@@ -634,6 +642,7 @@ export const PhysicalPageTurnStage = forwardRef<PhysicalPageTurnStageRef, Physic
     };
 
     const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType !== 'mouse') return;
       if (!isInteractingRef.current) return;
       isInteractingRef.current = false;
 
@@ -669,6 +678,206 @@ export const PhysicalPageTurnStage = forwardRef<PhysicalPageTurnStageRef, Physic
           turnDirectionRef.current = null;
           currentProgressRef.current = 0;
         });
+      }
+    };
+
+    // -------------------------------------------------------------
+    // MOBILE TOUCH GESTURE BRIDGE
+    // Connects mobile touch gestures to the EXACT SAME 3D curl engine
+    // with touch scroll safety (direction-locking) and gesture tracking
+    // -------------------------------------------------------------
+    const DIRECTION_LOCK_THRESHOLD = 8; // px threshold to distinguish horizontal turn from vertical page scroll
+
+    const handleTouchPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType !== 'touch') return;
+      if (!e.isPrimary) return;
+
+      if (
+        isZoomed ||
+        isAnimatingRef.current ||
+        isInteractingRef.current ||
+        isPreparingRef.current ||
+        pendingSpreadIndexRef.current !== null
+      ) {
+        return;
+      }
+
+      touchPointerIdRef.current = e.pointerId;
+      touchStartPosRef.current = { x: e.clientX, y: e.clientY };
+      touchStartTimeRef.current = performance.now();
+      touchGestureStateRef.current = 'pending';
+      wasSwipingRef.current = false;
+      // Do NOT preventDefault() or setPointerCapture() here to allow native vertical scrolling
+    };
+
+    const handleTouchPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType !== 'touch' || e.pointerId !== touchPointerIdRef.current) return;
+
+      if (touchGestureStateRef.current === 'vertical') {
+        // Confirmed vertical gesture: let browser handle normal page scrolling
+        return;
+      }
+
+      if (touchGestureStateRef.current === 'pending') {
+        const dx = e.clientX - touchStartPosRef.current.x;
+        const dy = e.clientY - touchStartPosRef.current.y;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+
+        // Direction-lock: remain pending until finger moves past threshold
+        if (absDx < DIRECTION_LOCK_THRESHOLD && absDy < DIRECTION_LOCK_THRESHOLD) {
+          return;
+        }
+
+        if (absDy > absDx) {
+          // Movement is predominantly vertical: lock to vertical scrolling
+          touchGestureStateRef.current = 'vertical';
+          return;
+        }
+
+        // Movement is predominantly horizontal: lock into page turn!
+        const direction: TurnDirection = dx < 0 ? 'next' : 'prev';
+        const destSpread = direction === 'next' ? nextSpread : prevSpread;
+        if (!destSpread) {
+          // Cannot turn past album bounds (first or last page)
+          touchGestureStateRef.current = 'vertical';
+          return;
+        }
+
+        touchGestureStateRef.current = 'horizontal';
+        wasSwipingRef.current = true;
+
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {}
+
+        // Determine grab region dynamically from vertical touch position
+        let region: GrabRegion = 'edge';
+        const stageEl = stageContainerRef.current;
+        if (stageEl) {
+          const rect = stageEl.getBoundingClientRect();
+          const relY = (touchStartPosRef.current.y - rect.top) / rect.height;
+          if (relY < 0.28) region = 'top-corner';
+          else if (relY > 0.72) region = 'bottom-corner';
+          else region = 'edge';
+        }
+
+        // Connect to the SAME interaction engine and state
+        isInteractingRef.current = true;
+        turnDirectionRef.current = direction;
+        grabRegionRef.current = region;
+        startPointerRef.current = { x: touchStartPosRef.current.x, y: touchStartPosRef.current.y };
+        currentProgressRef.current = 0;
+
+        // Ensure destination images are cached in background
+        imageCache.ensureSpreadReady(destSpread);
+
+        setTurnState({
+          active: true,
+          direction,
+          grabRegion: region,
+        });
+
+        requestAnimationFrame(() => {
+          applyTransform(0, direction, region);
+        });
+        return;
+      }
+
+      if (touchGestureStateRef.current === 'horizontal') {
+        if (!isInteractingRef.current || isAnimatingRef.current) return;
+
+        const isSingleSheet = (isCover && isWideCover) || (isBackCover && isWideBackCover);
+        const leafW = isSingleSheet ? fitWidth : fitWidth / 2;
+        const dx = e.clientX - startPointerRef.current.x;
+
+        let progress = 0;
+        if (turnDirectionRef.current === 'next') {
+          const dragDist = -dx;
+          progress = dragDist / (leafW * 0.95);
+        } else {
+          const dragDist = dx;
+          progress = dragDist / (leafW * 0.95);
+        }
+
+        if (progress < 0) {
+          progress = progress * 0.15;
+        }
+
+        currentProgressRef.current = Math.max(-0.05, Math.min(1.0, progress));
+        applyTransform(
+          currentProgressRef.current,
+          turnDirectionRef.current!,
+          grabRegionRef.current
+        );
+      }
+    };
+
+    const handleTouchPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerType !== 'touch' || e.pointerId !== touchPointerIdRef.current) return;
+
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+
+      const wasInteracting = isInteractingRef.current;
+      isInteractingRef.current = false;
+      touchPointerIdRef.current = null;
+      const prevGestureState = touchGestureStateRef.current;
+      touchGestureStateRef.current = 'idle';
+
+      if (wasInteracting && prevGestureState === 'horizontal') {
+        const p = currentProgressRef.current;
+        const dir = turnDirectionRef.current || 'next';
+        const dt = Math.max(1, performance.now() - touchStartTimeRef.current);
+        const forwardDragDist =
+          dir === 'next'
+            ? -(e.clientX - touchStartPosRef.current.x)
+            : e.clientX - touchStartPosRef.current.x;
+        const velocity = forwardDragDist > 0 ? forwardDragDist / dt : 0;
+
+        const isThresholdReached = p >= 0.35 || (p >= 0.18 && velocity > 0.45 && dt < 350);
+
+        if (isThresholdReached) {
+          animateTo(1.0, 260, () => {
+            const nextIdx =
+              dir === 'next'
+                ? currentSpread.spreadIndex + 1
+                : currentSpread.spreadIndex - 1;
+            pendingSpreadIndexRef.current = nextIdx;
+            onSpreadChange(nextIdx);
+
+            // Safety fallback if React update doesn't trigger within 350ms
+            setTimeout(() => {
+              if (pendingSpreadIndexRef.current !== null) {
+                pendingSpreadIndexRef.current = null;
+                turnDirectionRef.current = null;
+                currentProgressRef.current = 0;
+                setTurnState(null);
+              }
+            }, 350);
+          });
+        } else {
+          animateTo(0.0, 220, () => {
+            setTurnState(null);
+            turnDirectionRef.current = null;
+            currentProgressRef.current = 0;
+          });
+        }
+      }
+    };
+
+    const handleTouchPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+      handleTouchPointerUp(e);
+    };
+
+    const handleTouchClickCapture = (e: React.MouseEvent) => {
+      if (wasSwipingRef.current) {
+        e.stopPropagation();
+        e.preventDefault();
+        setTimeout(() => {
+          wasSwipingRef.current = false;
+        }, 60);
       }
     };
 
@@ -718,6 +927,7 @@ export const PhysicalPageTurnStage = forwardRef<PhysicalPageTurnStageRef, Physic
         style={{
           width: `${fitWidth}px`,
           height: `${fitHeight}px`,
+          touchAction: isZoomed ? 'none' : 'pan-y',
           boxShadow: `
             -3px 4px 0 0 rgba(230, 226, 218, 0.9),
             3px 4px 0 0 rgba(230, 226, 218, 0.9),
@@ -726,6 +936,11 @@ export const PhysicalPageTurnStage = forwardRef<PhysicalPageTurnStageRef, Physic
             0 0 1px 1px rgba(0, 0, 0, 0.1)
           `,
         }}
+        onPointerDown={handleTouchPointerDown}
+        onPointerMove={handleTouchPointerMove}
+        onPointerUp={handleTouchPointerUp}
+        onPointerCancel={handleTouchPointerCancel}
+        onClickCapture={handleTouchClickCapture}
       >
         {/* Base physical album paper board (endpaper) behind all spreads */}
         <div className="absolute inset-0 rounded-sm bg-[#0d101a] pointer-events-none z-0" />
@@ -1182,7 +1397,7 @@ export const PhysicalPageTurnStage = forwardRef<PhysicalPageTurnStageRef, Physic
         {/* Next zones on right; Prev zones on left                   */}
         {/* ========================================================== */}
         {!isZoomed && (
-          <div className="absolute inset-0 pointer-events-none z-40">
+          <div className="absolute inset-0 pointer-events-none z-40" style={{ touchAction: 'pan-y' }}>
             {nextSpread && (
               <>
                 <div

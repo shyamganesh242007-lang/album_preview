@@ -66,11 +66,14 @@ export const ZoomPanContainer: React.FC<ZoomPanContainerProps> = ({
     return () => el.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
 
-  // Mouse drag panning when zoomed
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Mouse and touch drag panning when zoomed
+  const handlePointerDown = (e: React.PointerEvent) => {
     if (zoom <= 1 || disabled) return;
-    // Only drag with left mouse button
-    if (e.button !== 0) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
 
     setIsDragging(true);
     dragStartRef.current = {
@@ -81,7 +84,7 @@ export const ZoomPanContainer: React.FC<ZoomPanContainerProps> = ({
     };
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging || zoom <= 1) return;
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
@@ -96,17 +99,21 @@ export const ZoomPanContainer: React.FC<ZoomPanContainerProps> = ({
     setPan({ x: newX, y: newY });
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = (e: React.PointerEvent) => {
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
     setIsDragging(false);
   };
 
   return (
     <div
       ref={containerRef}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      style={{ touchAction: zoom > 1 ? 'none' : 'pan-y' }}
       className={`relative w-full h-full overflow-hidden flex items-center justify-center select-none ${
         zoom > 1 ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : ''
       }`}

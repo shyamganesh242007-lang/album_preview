@@ -103,6 +103,7 @@ export const PageSpread: React.FC<PageSpreadProps> = ({
   return (
     <div
       ref={containerRef}
+      style={{ touchAction: isZoomed ? 'none' : 'pan-y' }}
       className="flex items-center justify-center w-full h-full select-none"
     >
       {fitWidth && fitHeight && (
